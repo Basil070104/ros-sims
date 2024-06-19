@@ -1,0 +1,16 @@
+<!-- <launch>
+    <arg name="map" default="$(find simulations)/maps/short-course-33.yml" />
+
+    <node pkg="map_server" name="map_server" type="map_server" args="$(arg map)" />
+</launch> -->
+
+<launch>
+    <arg name="control_topic" default="/car/mux/ackermann_cmd_mux/input/navigation" />
+    <arg name="init_pose_topic" default="/initialpose" />
+
+    <node pkg="simulations" type="simulation.py" name="simulation" output="screen">
+        <param name="control_topic" value="$(arg control_topic)" />
+        <param name="init_pose_topic" value="$(arg init_pose_topic)" />
+    </node>
+</launch>
+
