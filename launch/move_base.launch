@@ -5,9 +5,11 @@
     <!-- <node name="map_server" pkg="map_server" type="map_server" args="$(find my_map_package)/my_map.pgm my_map_resolution"/> -->
 
  <!--- Run AMCL --> 
-    <include file="$(find amcl)/examples/amcl_omni.launch" />
+  <include file="$(find amcl)/examples/amcl_omni.launch" />
 
    <!-- <arg name="base_global_planner" default=/> -->
+
+  <node pkg="topic_tools" type="relay" name="scan_relay" args="car/scan /scan" />
 
   <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
     <rosparam file="$(find simulations)/config/costmap_common_params.yaml" command="load" ns="global_costmap" /> 
@@ -16,5 +18,8 @@
     <rosparam file="$(find simulations)/config/global_costmap_params.yaml" command="load" /> 
     <rosparam file="$(find simulations)/config/base_local_planner_params.yaml" command="load" />
  </node>
+
+ <!-- Twist to Ackermann Converter Node -->
+ <node pkg="simulations" type="motor_control.py" name="twist_to_ackermann" output="screen"/>
 
 </launch>
