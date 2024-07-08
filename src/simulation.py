@@ -80,7 +80,7 @@ def pose_callback(data):
 
     # return x, y, z, w
   
-def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan):
+def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, global_plan_pub):
     init = plan[0]
     send_init_pose(pub_init_pose, init)
     poses_list = list()
@@ -104,9 +104,26 @@ def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan):
     header.frame_id = "/map"
     plan_publish.publish(Path(header=header,poses=poses_list))
     print("Done Printing Path On Rviz . . .")
+    goal = poses_list[len(poses_list) - 1]
+    time = rospy.get_rostime()
+    goal.pose.orientation.z = 0.7
+    goal.pose.orientation.w = 0.7
+    goal.header.frame_id = "map"
+    goal.header.stamp.secs = time.secs
+    goal.header.stamp.nsecs = time.nsecs
+    goal_pub.publish(goal)
 
-    for i in range(0, len(plan) - 1):
-        send_command(pub_controls, orientation_sub, plan[i], plan[i + 1])
+    rate = rospy.Rate(1)
+    global_plan_pub.publish(Path(header=header, poses=poses_list))
+
+    while not rospy.is_shutdown():
+      global_plan_pub.publish(Path(header=header, poses=poses_list))
+
+      rate.sleep()
+
+
+    # for i in range(0, len(plan) - 1):
+    #     send_command(pub_controls, orientation_sub, plan[i], plan[i + 1])
         
     # for c in plan:
     #     send_command(pub_controls, c)
@@ -171,6 +188,10 @@ if __name__ == "__main__":
     plan_publish = rospy.Publisher("car/global_path", Path, queue_size=10)
 
     odom_sub = rospy.Subscriber("car/vesc/odom", Odometry, odom_callback)
+
+    global_plan_pub = rospy.Publisher("/move_base/TrajectoryPlannerROS/global_plan", Path, queue_size=10)
+
+    goal_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
     
     # plan_file = rospy.get_param("~plan_file")
 
@@ -181,4 +202,5 @@ if __name__ == "__main__":
     # Publishers sometimes need a warm-up time, you can also wait until there
     # are subscribers to start publishing see publisher documentation.
     rospy.sleep(1.0)
-    run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan)
+    run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, global_plan_pub)
+    rospy.spin()

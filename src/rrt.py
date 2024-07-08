@@ -138,8 +138,6 @@ def nearest_node(new_node, valid_nodes):
   return nearest_node, distance
 
 # def line_collision_algo(curr, other):
-  
-
 
 def rrt(image, nodes_arr, numIterations, end_id):
 
