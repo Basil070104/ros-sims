@@ -10,3 +10,4 @@ global_costmap:
   rolling_window: true
   # plugins:
   #   - {name: static_layer, type: 'costmap_2d::StaticLayer'}
+
