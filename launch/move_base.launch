@@ -11,13 +11,14 @@
 
   <node pkg="topic_tools" type="relay" name="scan_relay" args="car/scan /scan" />
 
-  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+  <!-- <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <param name="base_global_planner" value="navfn/NavfnROS"/>
     <rosparam file="$(find simulations)/config/costmap_common_params.yaml" command="load" ns="global_costmap" /> 
     <rosparam file="$(find simulations)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
     <rosparam file="$(find simulations)/config/local_costmap_params.yaml" command="load" />
     <rosparam file="$(find simulations)/config/global_costmap_params.yaml" command="load" /> 
     <rosparam file="$(find simulations)/config/base_local_planner_params.yaml" command="load" />
- </node>
+ </node> -->
 
  <!-- Twist to Ackermann Converter Node -->
  <node pkg="simulations" type="motor_control.py" name="twist_to_ackermann" output="screen"/>
