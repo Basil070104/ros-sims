@@ -16,6 +16,8 @@ from std_msgs.msg import Header
 from tf.transformations import quaternion_from_euler
 import tf
 import move_base
+import numpy as np
+import matplotlib.pyplot as plt
 
 import astar
 import dijkstras
@@ -84,6 +86,21 @@ def pose_callback(data):
 
     # return x, y, z, w
 
+def calc_vel(d_x, d_y, t):
+  # dx = d_x(t) / 40
+  # dy = d_y(t) /40
+  return math.sqrt(d_x(t)**2 + d_y(t)**2)
+
+def calc_ang(d_x, d_y, dd_x, dd_y, t):
+   curve = ((d_x(t) * dd_y(t)) - (d_y(t) * dd_x(t)))/(math.pow(d_x(t)**2 + d_y(t)**2, 3/2))
+   return curve * calc_vel(d_x, d_y, t)
+
+def heading(dx, dy, t):
+   return math.atan2(dy(t), dx(t))
+
+def calc_accel(ddx, ddy, t):
+   return math.sqrt((ddx(t) * ddx(t)) + (ddy(t) * ddy(t)))
+
 def compute_twist(current_pose, target_pose):
     twist = Twist()
 
@@ -120,7 +137,7 @@ def compute_twist(current_pose, target_pose):
 
 
 def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, global_plan_pub):
-    init = plan[0]
+    init = spline_x(0), spline_y(0)
     send_init_pose(pub_init_pose, init)
     poses_list = list()
     time = rospy.get_rostime()
@@ -180,31 +197,57 @@ def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, g
     rate = rospy.Rate(1)
     global_plan_pub.publish(Path(header=header, poses=poses_list))
 
-    desired = rospy.Duration(secs=3)
-    start = rospy.Time().now()
-    i = 0
-    print(curr_x, curr_y, quat_w)
-    while not rospy.is_shutdown():
-       if rospy.Time().now() - start > desired and i < len(poses_list) - 15:
-        # print(rospy.Time().now() - start)
-        twist = compute_twist(poses_list[i], poses_list[i + 15])
-        cmd_vel_pub.publish(twist)
-        start = rospy.Time().now()
-        i += 15
+    # desired = rospy.Duration(secs=3)
+    # start = rospy.Time().now()
+    
+    # i = 0
+    # print(curr_x, curr_y, quat_w)
+    # while not rospy.is_shutdown():
+    #    if rospy.Time().now() - start > desired and i < len(poses_list) - 15:
+    #     # print(rospy.Time().now() - start)
+    #     twist = compute_twist(poses_list[i], poses_list[i + 15])
+    #     cmd_vel_pub.publish(twist)
+    #     start = rospy.Time().now()
+    #     i += 15
+
+    rate = rospy.Rate(10)
+    index = 1
+    fig , ax = plt.subplots(1,3)
+    fig.set_size_inches(15,6)
+    fig.tight_layout()
+    while index < len(t_interp):
+      t = t_interp[index]
+      val = calc_vel(spline_x.derivative(nu=1), spline_y.derivative(nu=1), t)
+      ang = calc_ang(spline_x.derivative(nu=1), spline_y.derivative(nu=1), spline_x.derivative(nu=2), spline_y.derivative(nu=2), t)
+      head = heading(spline_x.derivative(nu=1), spline_y.derivative(nu=1), t)
+      accel = calc_accel(spline_x.derivative(nu=2), spline_y.derivative(nu=2), t)
+      twist = Twist()
+      print(t, spline_x(t), spline_y(t), curr_x, curr_y)
+      # ax[0].plot((spline_x(t) / 40), ((800 - spline_y(t)) / 40), "o", color="purple")
+      ax[0].plot((spline_x(t)), ((spline_y(t))), "o-", color="purple", label="Desired")
+      ax[0].plot( curr_x, curr_y, "o-", color="red", label="Actual")
+      ax[0].legend(loc="lower left")
+      ax[0].set_title("Desired vs. Actual")
+      ax[1].plot(t, val, 'o-', color="blue")
+      ax[1].set_title("Speed")
+      ax[2].plot(t, ang * 5, 'o-', color="green")
+      ax[2].set_title("Angular Velocity")
+      twist.linear.x = val * 1.03
+      # twist.linear.y = accel / 40
+      twist.angular.x = ang * 4.75
+      # twist.angular.z = ang 
+      cmd_vel_pub.publish(twist)
+      index+=1
+      rate.sleep()
+    
+    plt.show()
        
 
-    while not rospy.is_shutdown():
-      global_plan_pub.publish(Path(header=header, poses=poses_list))
+    # while not rospy.is_shutdown():
+    #   global_plan_pub.publish(Path(header=header, poses=poses_list))
 
-      rate.sleep()
+    #   rate.sleep()
 
-
-    # for i in range(0, len(plan) - 1):
-    #     send_command(pub_controls, orientation_sub, plan[i], plan[i + 1])
-        
-    # for c in plan:
-    #     send_command(pub_controls, c)
-    
 def odom_callback(data):
    
    global curr_x, curr_y, quat_w
@@ -224,8 +267,10 @@ def send_init_pose(pub_init_pose, init_pose):
     pose_data = init_pose
 
     print(float(pose_data[0]) , float(pose_data[1]))
-    x, y, theta = float(pose_data[0]) / 40, (800 - float(pose_data[1])) / 40, math.radians(90)
-    print(x , y, theta)
+    # x, y, theta = float(pose_data[0]) / 40, (800 - float(pose_data[1])) / 40, math.radians(90)
+    # x, y, theta = pose_data[0], pose_data[1], calc_ang(spline_x.derivative(nu=1), spline_y.derivative(nu=1), spline_x.derivative(nu=2), spline_y.derivative(nu=2), 0.1)
+    x, y, theta = pose_data[0], pose_data[1], heading(spline_x.derivative(nu=1), spline_y.derivative(1), 0.1)
+    print(x , y, heading(spline_x.derivative(nu=1), spline_y.derivative(1), 0.1))
     q = Quaternion(*quaternion_from_euler(0, 0, theta))
     point = Point(x=x, y=y)
     pose = PoseWithCovariance(pose=Pose(position=point, orientation=q))
@@ -277,12 +322,46 @@ if __name__ == "__main__":
     goal_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
 
     cmd_vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
+
+    spline_pub = rospy.Publisher("car/spline", Path, queue_size=1)
     
     # plan_file = rospy.get_param("~plan_file")
 
     # with open(plan_file) as f:
     #     plan = f.readlines()
-    plan, spline = astar.main()
+    plan, spline_x, spline_y, t_arr = astar.main()
+    # print(spline(400))
+
+    spline_list = list()
+    time = rospy.get_rostime()
+    t_interp = np.linspace(np.min(t_arr), np.max(t_arr), np.max(t_arr) / 0.1)
+
+    for t in t_interp: 
+        # x, y = float(spline_x(t)) / 40,(800 - float(spline_y(t))) / 40
+        x, y = spline_x(t), spline_y(t)
+        stamped = PoseStamped()
+        pose = Pose()
+        pose.position.x = x
+        pose.position.y = y
+        pose.position.z = 0
+
+        pose.orientation.z = 0.7
+        pose.orientation.w = 0.7
+
+        # pose.orientation.x = 0
+        # pose.orientation.y = 0
+        # pose.orientation.z = 0
+        # pose.orientation.w = 0
+        stamped.pose = pose
+        stamped.header.frame_id= "map"
+        stamped.header.stamp.secs = time.secs
+        stamped.header.stamp.nsecs = time.nsecs
+        spline_list.append(stamped)
+       
+
+    header = Header()
+    header.frame_id = "/map"
+    spline_pub.publish(Path(header=header,poses=spline_list))
 
     # Publishers sometimes need a warm-up time, you can also wait until there
     # are subscribers to start publishing see publisher documentation.

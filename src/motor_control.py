@@ -8,7 +8,9 @@ def twist_callback(msg):
     ackermann_msg = AckermannDriveStamped()
     ackermann_msg.header.stamp = rospy.Time.now()
     ackermann_msg.drive.speed = msg.linear.x
-    ackermann_msg.drive.steering_angle = msg.angular.z
+    ackermann_msg.drive.acceleration = msg.linear.y
+    ackermann_msg.drive.steering_angle = msg.angular.x
+    ackermann_msg.drive.steering_angle_velocity = msg.angular.z
 
     ackermann_pub.publish(ackermann_msg)
 

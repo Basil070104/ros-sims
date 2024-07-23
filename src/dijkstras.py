@@ -388,7 +388,7 @@ def main():
     spline = cubic_spline(ax[3], solution)
 
     # plt.figure(figsize=(14,12))
-    plt.show()
+    plt.show(block=False)
 
     # cv2.imshow('Path Simple', image_path)
 
