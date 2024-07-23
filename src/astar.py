@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 import heapq
 import numpy as np
 import scipy.linalg as lu
-from scipy.interpolate import interp1d
+from scipy.interpolate import CubicSpline
 import sympy
+import pygame
 
 # Start Postion : X = 482, Y = 547
 # End Position : X = 309, Y = 233
@@ -93,15 +94,15 @@ def create_adjlist(nodes_arr):
         addEdge(adjlist, nodes_arr, temp_id + 1, 1)
         addEdge(adjlist, nodes_arr, temp_id - 800, 1)
         addEdge(adjlist, nodes_arr, temp_id + 800, 1)
-        addEdge(adjlist, nodes_arr, temp_id - 800 - 1, math.sqrt(2))
-        addEdge(adjlist, nodes_arr, temp_id - 800 + 1, math.sqrt(2))
-        addEdge(adjlist, nodes_arr, temp_id + 800 - 1, math.sqrt(2))
-        addEdge(adjlist, nodes_arr, temp_id + 800 + 1, math.sqrt(2))
+        # addEdge(adjlist, nodes_arr, temp_id - 800 - 1, math.sqrt(2))
+        # addEdge(adjlist, nodes_arr, temp_id - 800 + 1, math.sqrt(2))
+        # addEdge(adjlist, nodes_arr, temp_id + 800 - 1, math.sqrt(2))
+        # addEdge(adjlist, nodes_arr, temp_id + 800 + 1, math.sqrt(2))
 
-        # addEdge(adjlist, nodes_arr, temp_id - 800 - 1, 2)
-        # addEdge(adjlist, nodes_arr, temp_id - 800 + 1, 2)
-        # addEdge(adjlist, nodes_arr, temp_id + 800 - 1, 2)
-        # addEdge(adjlist, nodes_arr, temp_id + 800 + 1, 2)
+        addEdge(adjlist, nodes_arr, temp_id - 800 - 1, 2)
+        addEdge(adjlist, nodes_arr, temp_id - 800 + 1, 2)
+        addEdge(adjlist, nodes_arr, temp_id + 800 - 1, 2)
+        addEdge(adjlist, nodes_arr, temp_id + 800 + 1, 2)
       except:
         print(temp_id)
       
@@ -181,6 +182,7 @@ def print_path(image, node_arr, end_id):
   solution = list()
   curr_id = end_id
   i = 0
+  time = 0
   while curr_id != 438082:
     x, y = node_arr[curr_id].getCoordinates()
     image[y][x] = 200
@@ -193,6 +195,10 @@ def print_path(image, node_arr, end_id):
     #   plt.pause(0.0001)
     #   i = 0
     # i+=1
+
+  for coor in solution:
+    coor[2] = time
+    time+=0.1
 
   return solution
 
@@ -278,7 +284,7 @@ def cubic_spline(axis, solution):
   # n # of interpolating splines (always 1 less than the number of data points we're using)
 
   index = 0
-  step_size = 1
+  step_size = 20
   while index < 1:
 
     coordinate = solution[index]
@@ -332,29 +338,56 @@ def cubic_spline(axis, solution):
 
   x = list()
   y = list()
+  t = list()
+
+  x_ = list()
+  y_ = list()
+
   i = 0  
   while i < len(solution) - step_size:
     coor = solution[i]
     # print(coor)
-    x_temp = coor[0]
-    y_temp = coor[1]
-    if x_temp not in x and y_temp not in y:
-      x.insert(0, coor[0])
-      y.insert(0, coor[1])
+    x_temp = float(coor[0]) / 40
+    y_temp = (800 - float(coor[1])) / 40
+    t_temp = coor[2]
+    # if x_temp not in x and y_temp not in y:
+
+    x_.append(x_temp)
+    y_.append(y_temp)
+
+    x.append(coor[0])
+    y.append(coor[1])
+    t.append(coor[2])
     i+= step_size
 
   x_arr = np.array(x)
   y_arr = np.array(y)
+  t_arr = np.array(t)
 
-  # print(x_arr)
+  x_t = np.array(x_)
+  y_t = np.array(y_)
+
+  print(t_arr)
+
+  print(x_arr)
   # print(np.any(x_arr[1:] <= x_arr[:-1]))
-  # print(y_arr)
-  y_cubic = interp1d(x=x_arr, y=y_arr, kind="cubic", assume_sorted=False)
-  x_interp = np.linspace(np.min(x_arr), np.max(x_arr), 50)
+  print(y_arr)
 
-  axis.plot(x_interp, y_cubic(x_interp), "red")
+  x_cubic = CubicSpline(x=t_arr, y=x_arr, bc_type="natural")
+  y_cubic = CubicSpline(x=t_arr, y=y_arr, bc_type="natural")
+  t_interp = np.linspace(np.min(t_arr), np.max(t_arr), 50)
 
-  return y_cubic
+  x_map = CubicSpline(x=t_arr, y=x_t, bc_type="natural")
+  y_map = CubicSpline(x=t_arr, y=y_t, bc_type="natural")
+
+  axis.plot(x_cubic(t_interp), y_cubic(t_interp), "red")
+
+  # y_cubic = CubicSpline(x=x_arr, y=y_arr)
+  # x_interp = np.linspace(np.min(x_arr), np.max(x_arr), 50)
+
+  # axis.plot(x_interp, y_cubic(x_interp), "red")
+
+  return x_map, y_map, x_cubic, y_cubic, t_arr
 
 def main():
   print("Running A* Simulation . . .")
@@ -449,13 +482,13 @@ def main():
   ax[3].set(xlim=[200, 600], ylim=[600, 200])
   ax[3].set_axis_off()
 
-  spline = cubic_spline(ax[3], solution)
+  spline_x, spline_y, x_cubic, y_cubic, t_arr = cubic_spline(ax[3], solution)
   
 
   # plt.figure(figsize=(14,12))
-  plt.show()
+  plt.show(block=False)
 
-  return solution, spline
+  return solution, spline_x, spline_y, x_cubic, y_cubic, t_arr
 
 if __name__ == "__main__":
   main()
