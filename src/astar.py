@@ -3,12 +3,15 @@ import cv2
 import math
 import matplotlib.pyplot as plt
 import heapq
+import numpy as np
+import scipy.linalg as lu
+from scipy.interpolate import interp1d
+import sympy
 
 # Start Postion : X = 482, Y = 547
 # End Position : X = 309, Y = 233
 # Adjacency list with (id, cost)
 # Starting Id : 438082
-
 
 # Start and End Nodes have a dimension of 5 x 5
 # x and y are the center of the nodes
@@ -160,12 +163,12 @@ def astar(image, nodes_arr):
             return
     
 
-    if i > 2000: 
-      plt.imshow(image)
-      plt.pause(0.0001)
-      i = 0
+    # if i > 2000: 
+    #   plt.imshow(image)
+    #   plt.pause(0.0001)
+    #   i = 0
 
-    i+=1
+    # i+=1
         # if not any(item.id == for item in pq)
 
     # for i in pq:
@@ -185,23 +188,184 @@ def print_path(image, node_arr, end_id):
     solution.insert(0, [x, y, 0])
     curr_id = node_arr[curr_id].pd 
 
-    if i > 50:
-      plt.imshow(image)
-      plt.pause(0.0001)
-      i = 0
-    i+=1
+    # if i > 50:
+    #   plt.imshow(image)
+    #   plt.pause(0.0001)
+    #   i = 0
+    # i+=1
 
   return solution
+
+def generate_vector_trajectory(axis, solution):
+
+  index = 0
+  step_size = 10
+  while index < len(solution) - step_size:
+    # print("here")
+
+    coordinate = solution[index]
+    future_coordinate = solution[index + step_size]
+
+    x_dist = future_coordinate[0] - coordinate[0]
+    y_dist = coordinate[1] - future_coordinate[1]
+
+    axis.quiver(coordinate[0], coordinate[1], x_dist, y_dist, color='r', scale=150, width=0.005)
+
+    index+=step_size
+  return
+
+def gauss_elimination(a_matrix,b_matrix):
+    #adding some contingencies to prevent future problems 
+    if a_matrix.shape[0] != a_matrix.shape[1]:
+        print("ERROR: Squarematrix not given!")
+        return
+    if b_matrix.shape[1] > 1 or b_matrix.shape[0] != a_matrix.shape[0]:
+        print("ERROR: Constant vector incorrectly sized")
+        return
+     
+    #initialization of nexessary variables
+    n=len(b_matrix)
+    m=n-1
+    i=0
+    j=i-1
+    x=np.zeros(n)
+    new_line="\n"
+    
+    #create our augmented matrix throug Numpys concatenate feature
+    augmented_matrix = np.concatenate((a_matrix, b_matrix,), axis=1)
+    print("the initial augmented matrix is: {x}{y}".format(x=new_line, y=augmented_matrix))
+    print("solving for the upper-triangular matrix:")
+    
+    
+    #applying gauss elimination:
+    while i<n:
+        
+        # Partial Pivoting
+        for p in range(i+1,n):
+          if abs(augmented_matrix[i,i]) < abs(augmented_matrix[p][i]):
+            augmented_matrix[[p,i]] = augmented_matrix[[i,p]]
+
+        if augmented_matrix[i][i]==0.0: #fail-safe to eliminate divide by zero erroor!
+            print("Divide by zero error")
+            return
+        for j in range(i+1,n):
+            scaling_factor=augmented_matrix[j][i]/augmented_matrix[i][i]
+            augmented_matrix[j]=augmented_matrix[j]-(scaling_factor * augmented_matrix[i])
+            print(augmented_matrix) #not needed, but nice to visualize the process
+            
+        i=i+1
+    
+        #backwords substitution!
+        x[m]=augmented_matrix[m][n]/augmented_matrix[m][m]
+        for k in range(n-2,-1,-1):
+            x[k]=augmented_matrix[k][n]
+            for j in range(k+1,n):
+                x[k]=x[k] - augmented_matrix[k][k]
+
+            x[k] = x[k] / augmented_matrix[k][k] 
+    
+    #displaying solution 
+    print("The following x vector matrix solves the above augmented matrix:")
+    for answer in range(n):
+        print("x{x} is {y}".format(x=answer,y=x[answer]))
+
+    return n
+
+
+def cubic_spline(axis, solution):
+  # Cubic Spline Interpolation -> 3 degrees of freedom
+  # Between each step size we can create a function of P1(x), P2(x), ... Pn(x)
+  # n # of interpolating splines (always 1 less than the number of data points we're using)
+
+  index = 0
+  step_size = 1
+  while index < 1:
+
+    coordinate = solution[index]
+    interior_coordinate = solution[index + step_size]
+    future_coordinate = solution[index + 2 * step_size]
+
+    cubic = np.zeros((8, 8))
+    # p1(x) = ax^3 + bx^2 + cx + d
+    x1, y1 = coordinate[0], coordinate[1]
+    cubic[0] = [x1**3, x1**2, x1, 1, 0, 0, 0, 0]
+    x2, y2 = interior_coordinate[0], interior_coordinate[1]
+    cubic[1] = [x2**3, x2**2, x2, 1, 0, 0, 0, 0]
+    x3, y3 = future_coordinate[0], future_coordinate[1]
+    cubic[2] = [0, 0, 0, 0, x2**3, x2**2, x2, 1]
+    cubic[3] = [0, 0, 0, 0, x3**3, x3**2, x3, 1]
+
+    # ---- derivatives of smoothness ---- #
+    # p1'(x) = 3ax^2 + 2bx + c
+    # p1'(x) = p2'(x)
+    cubic[4] = [-3 * (x2**2), -2 * (x2), -1, 0, 3 * (x2**2), 2 * (x2), 1, 0]
+    # p1''(x) = 6ax + 2b
+    # p1''(x) = p2''(x)
+    cubic[5] = [-6 * x2, -2, 0, 0, 6 * x2, 2, 0, 0]
+
+    # ---- normal interpolation ---- #
+    cubic[6] = [6 * x1, 2, 0, 0, 0, 0 , 0, 0]
+    cubic[7] = [0, 0, 0, 0, 6 * x3, 2 , 0, 0]
+
+    cubic_1 = np.array([[x1**3, x1**2, x1, 1, 0, 0, 0, 0],
+                        [x2**3, x2**2, x2, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, x2**3, x2**2, x2, 1],
+                        [0, 0, 0, 0, x3**3, x3**2, x3, 1],
+                        [-3 * (x2**2), -2 * (x2), -1, 0, 3 * (x2**2), 2 * (x2), 1, 0],
+                        [-6 * x2, -2, 0, 0, 6 * x2, 2, 0, 0],
+                        [6 * x1, 2, 0, 0, 0, 0 , 0, 0],
+                        [0, 0, 0, 0, 6 * x3, 2 , 0, 0]])
+
+    output = np.array([[y1],
+                      [y2],
+                      [y2],
+                      [y3],
+                      [0],
+                      [0],
+                      [0],
+                      [0]])
+    
+    # print(cubic)
+    # print(output)
+    index+=1  
+
+
+  x = list()
+  y = list()
+  i = 0  
+  while i < len(solution) - step_size:
+    coor = solution[i]
+    # print(coor)
+    x_temp = coor[0]
+    y_temp = coor[1]
+    if x_temp not in x and y_temp not in y:
+      x.insert(0, coor[0])
+      y.insert(0, coor[1])
+    i+= step_size
+
+  x_arr = np.array(x)
+  y_arr = np.array(y)
+
+  # print(x_arr)
+  # print(np.any(x_arr[1:] <= x_arr[:-1]))
+  # print(y_arr)
+  y_cubic = interp1d(x=x_arr, y=y_arr, kind="cubic", assume_sorted=False)
+  x_interp = np.linspace(np.min(x_arr), np.max(x_arr), 50)
+
+  axis.plot(x_interp, y_cubic(x_interp), "red")
+
+  return y_cubic
 
 def main():
   print("Running A* Simulation . . .")
 
   image_path = cv2.imread("/home/bkhwaja/vscode/catkin_wos/src/mushr/mushr_base/mushr_base/mushr_base/maps/mit/short-course-33.png", 0)
   height, width = image_path.shape
+  final_image = image_path.copy()
   # print(image_path.shape)
 
   adj_list = convert_to_nodes(image_path, height, width)
-
+  fig, ax = plt.subplots(1, 4)
 
   #inflating the edges to have room for error in collisions
   for gnode in adj_list:
@@ -236,8 +400,20 @@ def main():
   draw_node(image_path, x=482, y=547) # Starting Position
   draw_node(image=image_path, x=309, y=233) # Ending Position
 
-  plt.figure(2, figsize=(14,12))
-  plt.imshow(image_path)
+  # plt.figure(1, figsize=(14,12))
+  # plt.imshow(image_path)
+  # fig.set_figheight(50)
+  # fig.set_figwidth(50)
+  # plt.title("A* Path and Trajectory Evolution", fontweight="bold")
+  fig.set_size_inches(20, 6.5)
+  fig.suptitle("A* - Heuristic Graph Traversal", fontweight="bold", fontsize=20)
+  fig.tight_layout()
+  ax[0].imshow(image_path)
+  ax[0].set_title("Start and End Node", fontweight="bold")
+  ax[0].set(xlim=[200, 600], ylim=[600, 200])
+  ax[0].set_axis_off()
+  ax[0].annotate("Start", xy=(482, 547), xytext=(530,547), arrowprops={}, fontsize=15, fontweight="bold")
+  ax[0].annotate("End", xy=(309, 233), xytext=(221,233), arrowprops={}, fontsize=15, fontweight="bold")
 
   astar(image_path, adj_list)
 
@@ -250,16 +426,36 @@ def main():
 
   # print(end_id)
 
-  print("Printing Solution  . . .")
+  print("Printing Solution  . . . (Linear Interpolation)")
 
   solution = print_path(image_path, adj_list, end_id)
   # print(solution)
 
+  ax[1].imshow(image_path)
+  ax[1].set_title("Exploring and Linear Interpolation", fontweight="bold")
+  ax[1].set(xlim=[200, 600], ylim=[600, 200])
+  ax[1].set_axis_off()
+
+  print("Printing Vector Trajectory . . .")
+  generate_vector_trajectory(ax[2], solution)
+
+  ax[2].imshow(image_path)
+  ax[2].set_title("Vector Generation", fontweight="bold")
+  ax[2].set(xlim=[200, 600], ylim=[600, 200])
+  ax[2].set_axis_off()
+
+  ax[3].imshow(final_image)
+  ax[3].set_title("Cubic Spline Generation", fontweight="bold")
+  ax[3].set(xlim=[200, 600], ylim=[600, 200])
+  ax[3].set_axis_off()
+
+  spline = cubic_spline(ax[3], solution)
+  
+
   # plt.figure(figsize=(14,12))
-  plt.imshow(image_path)
   plt.show()
 
-  return solution
+  return solution, spline
 
 if __name__ == "__main__":
   main()

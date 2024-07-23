@@ -8,7 +8,8 @@ from geometry_msgs.msg import (
     PoseWithCovariance,
     PoseWithCovarianceStamped,
     Quaternion,
-    PoseStamped
+    PoseStamped,
+    Twist
 )
 from nav_msgs.msg import ( Path, Odometry)
 from std_msgs.msg import Header
@@ -23,6 +24,9 @@ import orientation
 
 car_orientation = None
 car_pose = None
+
+curr_x, curr_y, quat_w = 0, 0, 0
+
 
 def calculate_trajectory(initial, dest, time):
 #   print(initial, dest)
@@ -79,25 +83,75 @@ def pose_callback(data):
     # print("Received Orienation: x={x}, y={y}, z={z}, w={w}".format(x=x,y=y,z=z,w=w))
 
     # return x, y, z, w
-  
+
+def compute_twist(current_pose, target_pose):
+    twist = Twist()
+
+    # Compute the difference in position
+    dx = target_pose.pose.position.x - current_pose.pose.position.x
+    dy = target_pose.pose.position.y - current_pose.pose.position.y
+
+    # Compute the distance to the target
+    distance = (dx**2 + dy**2)**0.5
+
+    # Compute the angle to the target
+    target_yaw = tf.transformations.euler_from_quaternion([
+        target_pose.pose.orientation.x,
+        target_pose.pose.orientation.y,
+        target_pose.pose.orientation.z,
+        target_pose.pose.orientation.w
+    ])[2]
+
+    current_yaw = tf.transformations.euler_from_quaternion([
+        current_pose.pose.orientation.x,
+        current_pose.pose.orientation.y,
+        current_pose.pose.orientation.z,
+        current_pose.pose.orientation.w
+    ])[2]
+
+    angle_to_target = target_yaw - current_yaw
+
+    # Set linear and angular velocities
+    twist.linear.x = distance 
+    twist.angular.z = angle_to_target
+
+    return twist
+
+
+
 def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, global_plan_pub):
     init = plan[0]
     send_init_pose(pub_init_pose, init)
     poses_list = list()
+    time = rospy.get_rostime()
 
-    for coor in plan:
-        x, y = float(coor[0]) / 40,(800 - float(coor[1])) / 40
+    # print(plan)
+
+    for coor in range(0, len(plan) - 1):
+        coordinate = plan[coor]
+        x, y = float(coordinate[0]) / 40,(800 - float(coordinate[1])) / 40
         stamped = PoseStamped()
         pose = Pose()
         pose.position.x = x
         pose.position.y = y
         pose.position.z = 0
 
+        future_coordinate = plan[coor + 1]
+        future_x , future_y = float(future_coordinate[0]) / 40,(800 - float(future_coordinate[1])) / 40
+
+        angle = math.atan2(future_y - y, future_x - x)
+
+        pose.orientation.z = 0.7
+        pose.orientation.w = angle
+
         # pose.orientation.x = 0
         # pose.orientation.y = 0
         # pose.orientation.z = 0
         # pose.orientation.w = 0
         stamped.pose = pose
+        stamped.header.frame_id= "map"
+        stamped.header.stamp.secs = time.secs
+        stamped.header.stamp.nsecs = time.nsecs
         poses_list.append(stamped)
     
     header = Header()
@@ -105,7 +159,6 @@ def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, g
     plan_publish.publish(Path(header=header,poses=poses_list))
     print("Done Printing Path On Rviz . . .")
     goal = poses_list[len(poses_list) - 1]
-    time = rospy.get_rostime()
     goal.pose.orientation.z = 0.7
     goal.pose.orientation.w = 0.7
     goal.header.frame_id = "map"
@@ -113,8 +166,32 @@ def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, g
     goal.header.stamp.nsecs = time.nsecs
     goal_pub.publish(goal)
 
+    # # clear_obstacles = rospy.ServiceProxy('std_srvs/Empty.srv', )
+    # rospy.wait_for_service("/move_base/clear_costmaps")
+
+    # try : 
+    #    clearing_map = rospy.ServiceProxy("/move_base/clear_costmaps", )
+
+    # except rospy.ServiceException as e :
+    #   print("server didn't respond")
+    
+    # print("here ---")
+
     rate = rospy.Rate(1)
     global_plan_pub.publish(Path(header=header, poses=poses_list))
+
+    desired = rospy.Duration(secs=3)
+    start = rospy.Time().now()
+    i = 0
+    print(curr_x, curr_y, quat_w)
+    while not rospy.is_shutdown():
+       if rospy.Time().now() - start > desired and i < len(poses_list) - 15:
+        # print(rospy.Time().now() - start)
+        twist = compute_twist(poses_list[i], poses_list[i + 15])
+        cmd_vel_pub.publish(twist)
+        start = rospy.Time().now()
+        i += 15
+       
 
     while not rospy.is_shutdown():
       global_plan_pub.publish(Path(header=header, poses=poses_list))
@@ -130,8 +207,14 @@ def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, g
     
 def odom_callback(data):
    
-   curr_x = data.pose.pose.position.x
-   curr_y = data.pose.pose.position.y
+   global curr_x, curr_y, quat_w
+
+   curr_x = data.pose.position.x
+   curr_y = data.pose.position.y
+
+   quat_w = data.pose.orientation.w
+
+   return curr_x, curr_y, quat_w
 
   #  print(curr_x, curr_y)
 
@@ -187,17 +270,19 @@ if __name__ == "__main__":
 
     plan_publish = rospy.Publisher("car/global_path", Path, queue_size=10)
 
-    odom_sub = rospy.Subscriber("car/vesc/odom", Odometry, odom_callback)
+    odom_sub = rospy.Subscriber("car/car_pose", PoseStamped, odom_callback)
 
     global_plan_pub = rospy.Publisher("/move_base/TrajectoryPlannerROS/global_plan", Path, queue_size=10)
 
     goal_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
+
+    cmd_vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
     
     # plan_file = rospy.get_param("~plan_file")
 
     # with open(plan_file) as f:
     #     plan = f.readlines()
-    plan = astar.main()
+    plan, spline = astar.main()
 
     # Publishers sometimes need a warm-up time, you can also wait until there
     # are subscribers to start publishing see publisher documentation.
