@@ -280,9 +280,9 @@ def cubic_spline(axis, solution):
   x_arr = np.array(x)
   y_arr = np.array(y)
 
-  print(x_arr)
-  print(np.any(x_arr[1:] <= x_arr[:-1]))
-  print(y_arr)
+  # print(x_arr)
+  # print(np.any(x_arr[1:] <= x_arr[:-1]))
+  # print(y_arr)
   y_cubic = interp1d(x=x_arr, y=y_arr, kind="cubic", assume_sorted=False)
   x_interp = np.linspace(np.min(x_arr), np.max(x_arr), 50)
 
@@ -387,8 +387,12 @@ def main():
 
     spline = cubic_spline(ax[3], solution)
 
+    print("--------------Finished Execution--------------")
+
     # plt.figure(figsize=(14,12))
-    plt.show(block=False)
+
+    # Uncomment if you want to see the plot
+    # plt.show(block=False)
 
     # cv2.imshow('Path Simple', image_path)
 

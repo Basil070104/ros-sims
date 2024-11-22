@@ -8,6 +8,7 @@ import scipy.linalg as lu
 from scipy.interpolate import CubicSpline
 import sympy
 import pygame
+import time
 
 # Start Postion : X = 482, Y = 547
 # End Position : X = 309, Y = 233
@@ -367,11 +368,11 @@ def cubic_spline(axis, solution):
   x_t = np.array(x_)
   y_t = np.array(y_)
 
-  print(t_arr)
+  # print(t_arr)
 
-  print(x_arr)
-  # print(np.any(x_arr[1:] <= x_arr[:-1]))
-  print(y_arr)
+  # print(x_arr)
+  # # print(np.any(x_arr[1:] <= x_arr[:-1]))
+  # print(y_arr)
 
   x_cubic = CubicSpline(x=t_arr, y=x_arr, bc_type="natural")
   y_cubic = CubicSpline(x=t_arr, y=y_arr, bc_type="natural")
@@ -391,6 +392,8 @@ def cubic_spline(axis, solution):
 
 def main():
   print("Running A* Simulation . . .")
+
+  start = time.time()
 
   image_path = cv2.imread("/home/bkhwaja/vscode/catkin_wos/src/mushr/mushr_base/mushr_base/mushr_base/maps/mit/short-course-33.png", 0)
   height, width = image_path.shape
@@ -483,10 +486,17 @@ def main():
   ax[3].set_axis_off()
 
   spline_x, spline_y, x_cubic, y_cubic, t_arr = cubic_spline(ax[3], solution)
+
+  print("--------------Finished Execution--------------")
+
+  end = time.time()
+  execution_time = end - start
+  print("Executation time : " + str(execution_time))
   
 
   # plt.figure(figsize=(14,12))
-  plt.show(block=False)
+  # Uncomment if you want to see the plotted images
+  plt.show()
 
   return solution, spline_x, spline_y, x_cubic, y_cubic, t_arr
 

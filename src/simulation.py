@@ -137,7 +137,9 @@ def compute_twist(current_pose, target_pose):
 
 
 def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, global_plan_pub):
-    init = spline_x(0), spline_y(0)
+    init = x_cubic(0), y_cubic(0)
+    print(init)
+    # raise SystemExit
     send_init_pose(pub_init_pose, init)
     poses_list = list()
     time = rospy.get_rostime()
@@ -213,18 +215,18 @@ def run_plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, g
     rate = rospy.Rate(10)
     index = 1
     fig , ax = plt.subplots(1,3)
-    fig.set_size_inches(15,6)
+    fig.set_size_inches(15,8)
     fig.tight_layout()
     while index < len(t_interp):
       t = t_interp[index]
-      val = calc_vel(spline_x.derivative(nu=1), spline_y.derivative(nu=1), t)
-      ang = calc_ang(spline_x.derivative(nu=1), spline_y.derivative(nu=1), spline_x.derivative(nu=2), spline_y.derivative(nu=2), t)
-      head = heading(spline_x.derivative(nu=1), spline_y.derivative(nu=1), t)
-      accel = calc_accel(spline_x.derivative(nu=2), spline_y.derivative(nu=2), t)
+      val = calc_vel(x_cubic.derivative(nu=1), y_cubic.derivative(nu=1), t)
+      ang = calc_ang(x_cubic.derivative(nu=1), y_cubic.derivative(nu=1), x_cubic.derivative(nu=2), y_cubic.derivative(nu=2), t)
+      head = heading(x_cubic.derivative(nu=1), y_cubic.derivative(nu=1), t)
+      accel = calc_accel(x_cubic.derivative(nu=2), y_cubic.derivative(nu=2), t)
       twist = Twist()
-      print(t, spline_x(t), spline_y(t), curr_x, curr_y)
+      print(t, x_cubic(t), y_cubic(t), curr_x, curr_y)
       # ax[0].plot((spline_x(t) / 40), ((800 - spline_y(t)) / 40), "o", color="purple")
-      ax[0].plot((spline_x(t)), ((spline_y(t))), "o-", color="purple", label="Desired")
+      ax[0].plot((x_cubic(t)), ((y_cubic(t))), "o-", color="purple", label="Desired")
       ax[0].plot( curr_x, curr_y, "o-", color="red", label="Actual")
       ax[0].legend(loc="lower left")
       ax[0].set_title("Desired vs. Actual")
@@ -269,8 +271,8 @@ def send_init_pose(pub_init_pose, init_pose):
     print(float(pose_data[0]) , float(pose_data[1]))
     # x, y, theta = float(pose_data[0]) / 40, (800 - float(pose_data[1])) / 40, math.radians(90)
     # x, y, theta = pose_data[0], pose_data[1], calc_ang(spline_x.derivative(nu=1), spline_y.derivative(nu=1), spline_x.derivative(nu=2), spline_y.derivative(nu=2), 0.1)
-    x, y, theta = pose_data[0], pose_data[1], heading(spline_x.derivative(nu=1), spline_y.derivative(1), 0.1)
-    print(x , y, heading(spline_x.derivative(nu=1), spline_y.derivative(1), 0.1))
+    x, y, theta = pose_data[0], pose_data[1], heading(x_cubic.derivative(nu=1), y_cubic.derivative(1), 0.1)
+    print(x , y, heading(x_cubic.derivative(nu=1), y_cubic.derivative(1), 0.1))
     q = Quaternion(*quaternion_from_euler(0, 0, theta))
     point = Point(x=x, y=y)
     pose = PoseWithCovariance(pose=Pose(position=point, orientation=q))
@@ -329,7 +331,7 @@ if __name__ == "__main__":
 
     # with open(plan_file) as f:
     #     plan = f.readlines()
-    plan, spline_x, spline_y, t_arr = astar.main()
+    plan, x_cubic, y_cubic, spline_x, spline_y, t_arr = astar.main()
     # print(spline(400))
 
     spline_list = list()
@@ -338,7 +340,7 @@ if __name__ == "__main__":
 
     for t in t_interp: 
         # x, y = float(spline_x(t)) / 40,(800 - float(spline_y(t))) / 40
-        x, y = spline_x(t), spline_y(t)
+        x, y = x_cubic(t), y_cubic(t)
         stamped = PoseStamped()
         pose = Pose()
         pose.position.x = x
