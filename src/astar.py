@@ -22,10 +22,6 @@ def calculate_heuristic(x, y, end_x, end_y):
   dx = abs(x - end_x)
   dy = abs(y - end_y)
 
-  # h = D * (dx + dy) + (D2 - 2 * D) * min(dx, dy)
-  # where D is length of each node(usually = 1) and 
-  # D2 is diagonal distance between each node (usually = sqrt(2) ).
-
   D = 1
   D2 = math.sqrt(2)
   h = D * (dx + dy) + (D2 - 2 * D) * min(dx,dy)
@@ -108,16 +104,11 @@ def create_adjlist(nodes_arr):
         print(temp_id)
       
       gnodes.setAdjlist(adjlist)
-      # if gnodes.id == 438082:
-      #   print("id : {a} adjlist : {b}".format(a=gnodes.id, b=gnodes.adjlist))
 
 def astar(image, nodes_arr):
   pq = []
   arr_len = len(nodes_arr)
   visited = [False] *  arr_len
-  
-  # for i in range(0, arr_len):
-  #   heapq.heappush(pq, nodes_arr[i])
 
   start_id = 0
   for gnode in nodes_arr:
@@ -126,15 +117,11 @@ def astar(image, nodes_arr):
       start_id = gnode.getId()
       break
 
-  # print(start_id)
-  # print(arr_len)
-
   # set the starting point in the pq
   nodes_arr[start_id].setDistance(0)
   nodes_arr[start_id].f = nodes_arr[start_id].distance + nodes_arr[start_id].h
   heapq.heappush(pq, nodes_arr[start_id])
-
-  # print(pq[0].getDistance())
+  
   i = 0
 
   while len(pq) != 0:
@@ -144,11 +131,7 @@ def astar(image, nodes_arr):
     distance = gnode.distance
     f = gnode.f
     visited[id] = True
-    # print("id popped : {id} and distance : {distance}".format(id=id, distance=distance))
-
     adj_list = nodes_arr[id].getAdjlist()
-    # print(adj_list)
-
     for adjlink in adj_list:
       if not visited[adjlink[0]]:
         curr_dis = nodes_arr[adjlink[0]].distance
@@ -163,20 +146,6 @@ def astar(image, nodes_arr):
 
           if x == 309 and y == 233:
             return
-    
-
-    # if i > 2000: 
-    #   plt.imshow(image)
-    #   plt.pause(0.0001)
-    #   i = 0
-
-    # i+=1
-        # if not any(item.id == for item in pq)
-
-    # for i in pq:
-    #   print(i.id, i.distance)
-
-  # print(pq[0].id, pq[1].id, pq[2].id, pq[3].id, pq[4].id, pq[5].id)
 
 def print_path(image, node_arr, end_id):
 
@@ -191,6 +160,7 @@ def print_path(image, node_arr, end_id):
     solution.insert(0, [x, y, 0])
     curr_id = node_arr[curr_id].pd 
 
+    # For animating the search
     # if i > 50:
     #   plt.imshow(image)
     #   plt.pause(0.0001)
@@ -368,12 +338,6 @@ def cubic_spline(axis, solution):
   x_t = np.array(x_)
   y_t = np.array(y_)
 
-  # print(t_arr)
-
-  # print(x_arr)
-  # # print(np.any(x_arr[1:] <= x_arr[:-1]))
-  # print(y_arr)
-
   x_cubic = CubicSpline(x=t_arr, y=x_arr, bc_type="natural")
   y_cubic = CubicSpline(x=t_arr, y=y_arr, bc_type="natural")
   t_interp = np.linspace(np.min(t_arr), np.max(t_arr), 50)
@@ -395,7 +359,8 @@ def main():
 
   start = time.time()
 
-  image_path = cv2.imread("/home/bkhwaja/vscode/catkin_wos/src/mushr/mushr_base/mushr_base/mushr_base/maps/mit/short-course-33.png", 0)
+  # image_path = cv2.imread("/home/bkhwaja/vscode/catkin_wos/src/mushr/mushr_base/mushr_base/mushr_base/maps/mit/short-course-33.png", 0)
+  image_path = cv2.imread("/home/bkhwaja/vscode/catkin_wos/src/simulations/maps/short-course-33.png", 0)
   height, width = image_path.shape
   final_image = image_path.copy()
   # print(image_path.shape)
@@ -446,7 +411,8 @@ def main():
   fig.tight_layout()
   ax[0].imshow(image_path)
   ax[0].set_title("Start and End Node", fontweight="bold")
-  ax[0].set(xlim=[200, 600], ylim=[600, 200])
+  # ax[0].set(xlim=[200, 600], ylim=[600, 200])
+  ax[0].set(xlim=[0, 800], ylim=[800, 0])
   ax[0].set_axis_off()
   ax[0].annotate("Start", xy=(482, 547), xytext=(530,547), arrowprops={}, fontsize=15, fontweight="bold")
   ax[0].annotate("End", xy=(309, 233), xytext=(221,233), arrowprops={}, fontsize=15, fontweight="bold")
@@ -469,7 +435,7 @@ def main():
 
   ax[1].imshow(image_path)
   ax[1].set_title("Exploring and Linear Interpolation", fontweight="bold")
-  ax[1].set(xlim=[200, 600], ylim=[600, 200])
+  ax[1].set(xlim=[0, 800], ylim=[800, 0])
   ax[1].set_axis_off()
 
   print("Printing Vector Trajectory . . .")
@@ -477,12 +443,12 @@ def main():
 
   ax[2].imshow(image_path)
   ax[2].set_title("Vector Generation", fontweight="bold")
-  ax[2].set(xlim=[200, 600], ylim=[600, 200])
+  ax[2].set(xlim=[0, 800], ylim=[800, 0])
   ax[2].set_axis_off()
 
   ax[3].imshow(final_image)
   ax[3].set_title("Cubic Spline Generation", fontweight="bold")
-  ax[3].set(xlim=[200, 600], ylim=[600, 200])
+  ax[3].set(xlim=[0, 800], ylim=[800, 0])
   ax[3].set_axis_off()
 
   spline_x, spline_y, x_cubic, y_cubic, t_arr = cubic_spline(ax[3], solution)
