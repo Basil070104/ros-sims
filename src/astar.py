@@ -7,7 +7,6 @@ import numpy as np
 import scipy.linalg as lu
 from scipy.interpolate import CubicSpline
 import sympy
-import pygame
 import time
 
 # Start Postion : X = 482, Y = 547
@@ -360,7 +359,7 @@ def main():
   start = time.time()
 
   # image_path = cv2.imread("/home/bkhwaja/vscode/catkin_wos/src/mushr/mushr_base/mushr_base/mushr_base/maps/mit/short-course-33.png", 0)
-  image_path = cv2.imread("/home/bkhwaja/vscode/catkin_wos/src/simulations/maps/short-course-33.png", 0)
+  image_path = cv2.imread("/home/bkhwaja/vscode/catkin_wos/src/simulations/maps/plain.png", 0)
   height, width = image_path.shape
   final_image = image_path.copy()
   # print(image_path.shape)
@@ -385,7 +384,7 @@ def main():
       adj_list[temp_id - 4].active = False
       adj_list[temp_id - 5].active = False
 
-      adj_list[temp_id + 800].active = False
+      adj_list[temp_id + 8100].active = False
       adj_list[temp_id + 800 * 2].active = False
 
       adj_list[temp_id - 800].active = False
@@ -401,11 +400,6 @@ def main():
   draw_node(image_path, x=482, y=547) # Starting Position
   draw_node(image=image_path, x=309, y=233) # Ending Position
 
-  # plt.figure(1, figsize=(14,12))
-  # plt.imshow(image_path)
-  # fig.set_figheight(50)
-  # fig.set_figwidth(50)
-  # plt.title("A* Path and Trajectory Evolution", fontweight="bold")
   fig.set_size_inches(20, 6.5)
   fig.suptitle("A* - Heuristic Graph Traversal", fontweight="bold", fontsize=20)
   fig.tight_layout()

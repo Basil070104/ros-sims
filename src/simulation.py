@@ -9,10 +9,10 @@ from geometry_msgs.msg import (
     PoseWithCovarianceStamped,
     Quaternion,
     PoseStamped,
-    Twist
+    Twist,
 )
 from nav_msgs.msg import ( Path, Odometry)
-from std_msgs.msg import Header
+from std_msgs.msg import ( Header , Float64)
 from tf.transformations import quaternion_from_euler
 import tf
 import move_base
@@ -32,13 +32,21 @@ class Simulation:
     car_orientation = None
     car_pose = None
 
-    curr_x, curr_y, quat_w = 0, 0, 0
+    self.curr_x, self.curr_y, self.quat_w = 0, 0, 0
+    self.curr_speed = 0
     self.x_cubic = None
     self.y_cubic = None
     self.goal_pub = None
     self.cmd_vel_pub = None
+    self.ackermann_pub = None
     self.t_interp = None
     self.method = method
+    
+    self.target_speed = 1.0
+    self.speed_increment = 0.1
+    
+    self.speed_timer = rospy.Timer(rospy.Duration(0.1), self.speed)
+    
 
   def calculate_trajectory(self, initial, dest, time):
 
@@ -128,8 +136,102 @@ class Simulation:
       twist.angular.z = angle_to_target
 
       return twist
+    
+  def speed(self, msg):
+    self.curr_speed = msg.data
+    
+  def speed_ramp_up(self, event):
+    """Gradually ramp up speed from 0 to target speed."""
+    if self.curr_speed < self.target_speed:
+        self.curr_speed += self.speed_increment
+    else:
+        self.speed_timer.shutdown() 
+    
+  def pure_pursuit_controll(self, plan, pub_init_pose, global_plan_pub, plan_publish, K_dd, min_ld, max_ld, wheelbase):
+    """
+      pure pursuit control formulation : steering angle = arctan(2Lsin(alpha)/Kdd * Vf)
+    """
+    init = self.x_cubic(0), self.y_cubic(0)
+    print(init)
+    # raise SystemExit
+    self.send_init_pose(pub_init_pose, init)
+    poses_list = list()
+    time = rospy.get_rostime()
 
-  def plan(self,pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, global_plan_pub):
+    for coor in range(0, len(plan) - 1):
+        coordinate = plan[coor]
+        x, y = float(coordinate[0]) / 40,(800 - float(coordinate[1])) / 40
+        stamped = PoseStamped()
+        pose = Pose()
+        pose.position.x = x
+        pose.position.y = y
+        pose.position.z = 0
+
+        future_coordinate = plan[coor + 1]
+        future_x , future_y = float(future_coordinate[0]) / 40,(800 - float(future_coordinate[1])) / 40
+
+        angle = math.atan2(future_y - y, future_x - x)
+
+        pose.orientation.z = 0.7
+        pose.orientation.w = angle
+        stamped.pose = pose
+        stamped.header.frame_id= "map"
+        stamped.header.stamp.secs = time.secs
+        stamped.header.stamp.nsecs = time.nsecs
+        poses_list.append(stamped)
+    
+    header = Header()
+    header.frame_id = "/map"
+    plan_publish.publish(Path(header=header,poses=poses_list))
+    print("Done Printing Path On Rviz . . .")
+    goal = poses_list[len(poses_list) - 1]
+    goal.pose.orientation.z = 0.7
+    goal.pose.orientation.w = 0.7
+    goal.header.frame_id = "map"
+    goal.header.stamp.secs = time.secs
+    goal.header.stamp.nsecs = time.nsecs
+    self.goal_pub.publish(goal)
+
+    rate = rospy.Rate(1)
+    global_plan_pub.publish(Path(header=header, poses=poses_list))
+    
+    rate = rospy.Rate(10)
+    # fig , ax = plt.subplots(1,3)
+    # fig.set_size_inches(15,8)
+    # fig.tight_layout()
+    # print(zip())
+    for index, (t, target) in enumerate(zip(self.t_interp, plan)):
+      print("hello")
+      print(t)
+      x_target, y_target = float(target[0]) / 40,(800 - float(target[1])) / 40
+      print(x_target, y_target)
+      x = self.curr_x
+      y = self.curr_y
+      print(x,y)
+      l_d = np.clip(K_dd * self.curr_speed, min_ld, max_ld)
+      
+      dx = x_target - self.curr_x
+      dy = y_target - self.curr_y
+      distance = np.sqrt(dx**2 + dy**2)
+      
+      
+      if distance > l_d:
+        print("here")
+        print(self.curr_speed)
+        # break
+        alpha = np.arctan2(dy, dx)  # Angle to goal
+        steering_angle = np.arctan((2 * wheelbase * np.sin(alpha)) / l_d)
+
+        # Publish Ackermann command
+        drive_msg = AckermannDriveStamped()
+        
+        drive_msg.drive.steering_angle = steering_angle
+        drive_msg.drive.speed = self.curr_speed
+        self.ackermann_pub.publish(drive_msg)
+        break
+    
+
+  def plan(self,pub_init_pose, pub_controls,plan_publish, plan, global_plan_pub):
       init = self.x_cubic(0), self.y_cubic(0)
       print(init)
       # raise SystemExit
@@ -186,10 +288,10 @@ class Simulation:
         head = self.heading(self.x_cubic.derivative(nu=1), self.y_cubic.derivative(nu=1), t)
         accel = self.calc_accel(self.x_cubic.derivative(nu=2), self.y_cubic.derivative(nu=2), t)
         twist = Twist()
-        print(t, self.x_cubic(t), self.y_cubic(t), curr_x, curr_y)
+        print(t, self.x_cubic(t), self.y_cubic(t), self.curr_x, self.curr_y)
         # ax[0].plot((spline_x(t) / 40), ((800 - spline_y(t)) / 40), "o", color="purple")
         ax[0].plot((self.x_cubic(t)), ((self.y_cubic(t))), "o-", color="purple", label="Desired")
-        ax[0].plot( curr_x, curr_y, "o-", color="red", label="Actual")
+        ax[0].plot( self.curr_x, self.curr_y, "o-", color="red", label="Actual")
         ax[0].legend(loc="lower left")
         ax[0].set_title("Desired vs. Actual")
         ax[1].plot(t, val, 'o-', color="blue")
@@ -208,14 +310,12 @@ class Simulation:
       
   def odom_callback(self,data):
     
-    global curr_x, curr_y, quat_w
+    # global curr_x, curr_y, quat_w
 
-    curr_x = data.pose.position.x
-    curr_y = data.pose.position.y
+    self.curr_x = data.pose.position.x
+    self.curr_y = data.pose.position.y
 
-    quat_w = data.pose.orientation.w
-
-    return curr_x, curr_y, quat_w
+    self.quat_w = data.pose.orientation.w
 
   def send_init_pose(self,pub_init_pose, init_pose):
       pose_data = init_pose
@@ -267,6 +367,10 @@ class Simulation:
 
     spline_pub = rospy.Publisher("car/spline", Path, queue_size=1)
     
+    speed_sub = rospy.Subscriber("/car/vesc/commands/motor/speed", Float64, self.speed)
+    
+    self.ackermann_pub = rospy.Publisher("/car/mux/ackermann_cmd_mux/input/navigation", AckermannDriveStamped, queue_size=1)
+    
     plan, self.x_cubic, self.y_cubic, spline_x, spline_y, t_arr = self.method.main()
 
     spline_list = list()
@@ -297,8 +401,13 @@ class Simulation:
 
     # Publishers sometimes need a warm-up time, you can also wait until there
     # are subscribers to start publishing see publisher documentation.
+    K_dd = 0.5
+    min_ld = 0.5
+    max_ld = 2.0
+    wheelbase = 0.3
     rospy.sleep(1.0)
-    self.plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, global_plan_pub)
+    self.pure_pursuit_controll(plan, pub_init_pose, global_plan_pub, plan_publish, K_dd, min_ld, max_ld, wheelbase)
+    # self.plan(pub_init_pose, pub_controls, orientation_sub, plan_publish, plan, global_plan_pub)
     rospy.spin()
     
 if __name__ == "__main__":
