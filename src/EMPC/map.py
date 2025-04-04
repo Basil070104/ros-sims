@@ -27,7 +27,7 @@ import random                   as RD
 import matplotlib.pyplot        as PLT
 from matplotlib.patches         import Rectangle
 from matplotlib.collections     import PatchCollection
-from skopt.sampler              import Hammersly
+# from skopt.sampler              import Hammersly
 from sklearn.neighbors          import kneighbors_graph as knn_graph
 from scipy.spatial              import Voronoi, voronoi_plot_2d
 from shapely.geometry.polygon   import Polygon
@@ -35,7 +35,7 @@ from shapely.geometry           import Point
 from shapely.geometry           import mapping
 import torch
 
-from utility                    import log
+from EMPC.utility                    import log
 
 
 class Map():
@@ -76,7 +76,8 @@ class Map():
         #   (3-2) random nodes
         self.n_nodes    = args.nodes * 10 if args.nodes != 0 else 25
         self.size       = 10 * 10
-        self.nodes      = NP.array(Hammersly().generate([(0, self.size), (0, self.size)], self.n_nodes)) / self.size
+        # self.nodes      = NP.array(Hammersly().generate([(0, self.size), (0, self.size)], self.n_nodes)) / self.size
+        self.nodes      = NP.random.uniform(0, 1, (self.n_nodes, 2))
         self.all_nodes  = NP.vstack([self.origin, self.dest, self.nodes])
         valid_indx      = [i for i in range(len(self.all_nodes)) if not point_has_collision(self.all_nodes[i,:], self.obst)]
         self.nodes      = self.all_nodes[valid_indx,:]
